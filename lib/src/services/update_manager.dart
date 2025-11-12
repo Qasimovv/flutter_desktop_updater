@@ -19,7 +19,6 @@ class UpdateManager extends ChangeNotifier {
   UpdateInfo? _updateInfo;
   double _progress = 0.0;
   String? _error;
-  String? _downloadedFilePath;
 
   UpdateStatus get status => _status;
   UpdateInfo? get updateInfo => _updateInfo;

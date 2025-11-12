@@ -1,5 +1,6 @@
-library flutter_desktop_updater;
-
+/// Flutter Desktop Updater
+///
+/// Cross-platform auto-update system for Flutter desktop apps.
 export 'src/config/update_config.dart';
 export 'src/models/update_info.dart';
 export 'src/services/update_manager.dart';
