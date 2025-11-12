@@ -27,7 +27,6 @@ topics:
   - macos
   - windows
   - linux
-  - updater
 
 platforms:
   macos:
