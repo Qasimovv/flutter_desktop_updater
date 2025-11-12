@@ -32,7 +32,7 @@ dependencies:
 Or from pub.dev (once published):
 ```yaml
 dependencies:
-  flutter_desktop_updater: ^1.0.0
+  flutter_desktop_updater: ^0.0.1
 ```
 
 Then run:
