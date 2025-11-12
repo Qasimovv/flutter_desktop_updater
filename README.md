@@ -25,7 +25,7 @@ Add to your `pubspec.yaml`:
 dependencies:
   flutter_desktop_updater:
     git:
-      url: https://github.com/yourusername/flutter_desktop_updater.git
+      url: https://github.com/qasimovv/flutter_desktop_updater.git
       ref: main
 ```
 
@@ -285,10 +285,10 @@ MIT License - see [LICENSE](LICENSE) file for details.
 
 ## Support
 
-- 📫 [GitHub Issues](https://github.com/yourusername/flutter_desktop_updater/issues)
-- 📖 [Documentation](https://github.com/yourusername/flutter_desktop_updater/wiki)
-- 💬 [Discussions](https://github.com/yourusername/flutter_desktop_updater/discussions)
+- 📫 [GitHub Issues](https://github.com/qasimovv/flutter_desktop_updater/issues)
+- 📖 [Documentation](https://github.com/qasimovv/flutter_desktop_updater/wiki)
+- 💬 [Discussions](https://github.com/qasimovv/flutter_desktop_updater/discussions)
 
 ## Author
 
-[Your Name](https://github.com/yourusername)
+[Your Name](https://github.com/qasimovv)
