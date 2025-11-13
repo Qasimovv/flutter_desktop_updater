@@ -1,6 +1,6 @@
 name: flutter_desktop_updater
 description: Cross-platform auto-update system for Flutter desktop apps. Supports macOS, Windows, and Linux with smart permission handling.
-version: 0.0.2
+version: 0.0.3
 homepage: https://github.com/qasimovv/flutter_desktop_updater
 repository: https://github.com/qasimovv/flutter_desktop_updater
 

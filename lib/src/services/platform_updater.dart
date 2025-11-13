@@ -6,51 +6,102 @@ import 'package:path/path.dart' as path;
 class PlatformUpdater {
   String? _preparedScriptPath;
 
+  /// Logs message (always, including release builds)
+  void _log(String message) {
+    // ignore: avoid_print
+    print('[PlatformUpdater] $message');
+  }
+
   Future<bool> installUpdate(String zipPath) async {
     try {
-      if (kDebugMode) print('[PlatformUpdater] Starting installation: $zipPath');
+      _log('Starting installation: $zipPath');
 
       final extractPath = await _extractZip(zipPath);
       if (extractPath == null) {
-        if (kDebugMode) print('[PlatformUpdater] Failed to extract ZIP');
+        _log('Failed to extract ZIP');
         return false;
       }
 
       final newAppPath = await _findApp(extractPath);
       if (newAppPath == null) {
-        if (kDebugMode) print('[PlatformUpdater] Failed to find app in extracted files');
+        _log('Failed to find app in extracted files');
         return false;
       }
 
       final scriptPath = await _createUpdateScript(newAppPath);
       if (scriptPath == null) {
-        if (kDebugMode) print('[PlatformUpdater] Failed to create update script');
+        _log('Failed to create update script');
         return false;
       }
 
       _preparedScriptPath = scriptPath;
-      if (kDebugMode) print('[PlatformUpdater] Update ready, waiting for user to restart');
+      _log('Update ready, waiting for user to restart');
 
       return true;
     } catch (e) {
-      if (kDebugMode) print('[PlatformUpdater] Error: $e');
+      _log('Error: $e');
       return false;
     }
   }
 
+  /// Selects extraction method based on platform
   Future<String?> _extractZip(String zipPath) async {
+    // Use ditto on macOS (preserves symlinks)
+    if (Platform.isMacOS) {
+      return await _extractWithDitto(zipPath);
+    }
+
+    // Use archive package for Windows and Linux
+    return await _extractWithArchivePackage(zipPath);
+  }
+
+  /// Extract with ditto for macOS (preserves symlinks and code signature)
+  Future<String?> _extractWithDitto(String zipPath) async {
     try {
       final tempDir = Directory.systemTemp;
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final extractPath = path.join(tempDir.path, 'StaffCo-extracted-$timestamp');
 
-      if (kDebugMode) print('[PlatformUpdater] Reading ZIP file...');
+      _log('Extracting with ditto to: $extractPath');
+
+      // Create extraction directory
+      await Directory(extractPath).create(recursive: true);
+
+      // Extract with ditto
+      final result = await Process.run('ditto', [
+        '-x',           // extract mode
+        '-k',           // PKZip format
+        zipPath,        // source ZIP
+        extractPath,    // destination
+      ]);
+
+      if (result.exitCode != 0) {
+        _log('Ditto error: ${result.stderr}');
+        throw Exception('ditto failed: ${result.stderr}');
+      }
+
+      _log('Extraction complete with ditto');
+      return extractPath;
+    } catch (e) {
+      _log('Ditto extract error: $e');
+      return null;
+    }
+  }
+
+  /// Extract with archive package for Windows and Linux
+  Future<String?> _extractWithArchivePackage(String zipPath) async {
+    try {
+      final tempDir = Directory.systemTemp;
+      final timestamp = DateTime.now().millisecondsSinceEpoch;
+      final extractPath = path.join(tempDir.path, 'StaffCo-extracted-$timestamp');
+
+      _log('Reading ZIP file...');
       final bytes = await File(zipPath).readAsBytes();
 
-      if (kDebugMode) print('[PlatformUpdater] Decoding ZIP...');
+      _log('Decoding ZIP...');
       final archive = ZipDecoder().decodeBytes(bytes);
 
-      if (kDebugMode) print('[PlatformUpdater] Extracting ${archive.length} files to: $extractPath');
+      _log('Extracting ${archive.length} files to: $extractPath');
       final extractDir = Directory(extractPath);
       await extractDir.create(recursive: true);
 
@@ -74,17 +125,17 @@ class PlatformUpdater {
         }
       }
 
-      if (kDebugMode) print('[PlatformUpdater] Extraction complete: $extractPath');
+      _log('Extraction complete: $extractPath');
       return extractPath;
     } catch (e) {
-      if (kDebugMode) print('[PlatformUpdater] Extract error: $e');
+      _log('Extract error: $e');
       return null;
     }
   }
 
   Future<String?> _findApp(String extractPath) async {
     try {
-      if (kDebugMode) print('[PlatformUpdater] Searching for app in: $extractPath');
+      _log('Searching for app in: $extractPath');
       final dir = Directory(extractPath);
 
       await for (final entity in dir.list(recursive: true)) {
@@ -92,30 +143,30 @@ class PlatformUpdater {
 
         if (Platform.isMacOS) {
           if (entity is Directory && name.endsWith('.app')) {
-            if (kDebugMode) print('[PlatformUpdater] Found macOS app: ${entity.path}');
+            _log('Found macOS app: ${entity.path}');
             return entity.path;
           }
         } else if (Platform.isWindows) {
           if (entity is File && name.toLowerCase().endsWith('.exe') &&
               name.toLowerCase().contains('staffco')) {
-            if (kDebugMode) print('[PlatformUpdater] Found Windows exe: ${entity.parent.path}');
+            _log('Found Windows exe: ${entity.parent.path}');
             return entity.parent.path;
           }
         } else if (Platform.isLinux) {
           if (entity is File) {
             if (name.endsWith('.AppImage') ||
                 (name.toLowerCase() == 'staffco' && await _isExecutable(entity.path))) {
-              if (kDebugMode) print('[PlatformUpdater] Found Linux binary: ${entity.parent.path}');
+              _log('Found Linux binary: ${entity.parent.path}');
               return entity.parent.path;
             }
           }
         }
       }
 
-      if (kDebugMode) print('[PlatformUpdater] App not found in extracted files');
+      _log('App not found in extracted files');
       return null;
     } catch (e) {
-      if (kDebugMode) print('[PlatformUpdater] Find app error: $e');
+      _log('Find app error: $e');
       return null;
     }
   }
@@ -148,11 +199,11 @@ class PlatformUpdater {
             final currentUser = userResult.stdout.toString().trim();
 
             needsSudo = (owner != currentUser);
-            if (kDebugMode) print('[PlatformUpdater] Path: $currentAppPath');
-            if (kDebugMode) print('[PlatformUpdater] Owner: $owner, User: $currentUser');
-            if (kDebugMode) print('[PlatformUpdater] Needs sudo: $needsSudo');
+            _log('Path: $currentAppPath');
+            _log('Owner: $owner, User: $currentUser');
+            _log('Needs sudo: $needsSudo');
           } catch (e) {
-            if (kDebugMode) print('[PlatformUpdater] Could not check ownership: $e');
+            _log('Could not check ownership: $e');
           }
         }
 
@@ -163,7 +214,7 @@ class PlatformUpdater {
         await File(scriptPath).writeAsString(script);
         await Process.run('chmod', ['+x', scriptPath]);
 
-        if (kDebugMode) print('[PlatformUpdater] Created macOS script: $scriptPath');
+        _log('Created macOS script: $scriptPath');
         return scriptPath;
 
       } else if (Platform.isWindows) {
@@ -192,7 +243,7 @@ del "%~f0"
 
         await File(scriptPath).writeAsString(script);
 
-        if (kDebugMode) print('[PlatformUpdater] Created Windows script: $scriptPath');
+        _log('Created Windows script: $scriptPath');
         return scriptPath;
 
       } else if (Platform.isLinux) {
@@ -229,13 +280,13 @@ echo "[Update Script] Done!"
         await File(scriptPath).writeAsString(script);
         await Process.run('chmod', ['+x', scriptPath]);
 
-        if (kDebugMode) print('[PlatformUpdater] Created Linux script: $scriptPath');
+        _log('Created Linux script: $scriptPath');
         return scriptPath;
       }
 
       return null;
     } catch (e) {
-      if (kDebugMode) print('[PlatformUpdater] Script creation error: $e');
+      _log('Script creation error: $e');
       return null;
     }
   }
@@ -254,7 +305,7 @@ echo "[Update Script] Done!"
 #!/bin/bash
 echo "[Update Script] Starting update with admin privileges..."
 
-osascript -e 'do shell script "sleep 3 && killall StaffCo 2>/dev/null ; sleep 2 && rm -rf \\"$currentAppPath\\" && cp -R \\"$newAppPath\\" \\"$currentAppPath\\" && chmod -R +x \\"$currentAppPath/Contents/MacOS/\\" && sleep 1 && open \\"$currentAppPath\\"" with administrator privileges'
+osascript -e 'do shell script "sleep 3 && killall StaffCo 2>/dev/null ; sleep 2 && rm -rf \\"$currentAppPath\\" && ditto \\"$newAppPath\\" \\"$currentAppPath\\" && chmod -R +x \\"$currentAppPath/Contents/MacOS/\\" && sleep 1 && open \\"$currentAppPath\\"" with administrator privileges'
 
 echo "[Update Script] Cleaning up..."
 rm -f "$scriptPath"
@@ -277,8 +328,8 @@ sleep 2
 echo "[Update Script] Removing old app: $currentAppPath"
 rm -rf "$currentAppPath"
 
-echo "[Update Script] Copying new app: $newAppPath -> $currentAppPath"
-cp -R "$newAppPath" "$currentAppPath"
+echo "[Update Script] Copying new app with ditto (preserves code signature)..."
+ditto "$newAppPath" "$currentAppPath"
 
 echo "[Update Script] Setting permissions..."
 chmod -R +x "$currentAppPath/Contents/MacOS/"
@@ -296,14 +347,15 @@ echo "[Update Script] Done!"
   }
 
   Future<void> restartApp() async {
-    if (kDebugMode) print('[PlatformUpdater] User clicked restart button');
+    _log('User clicked restart button');
 
     if (_preparedScriptPath == null) {
-      if (kDebugMode) print('[PlatformUpdater] No script prepared, just exiting');
+      _log('No script prepared, just exiting');
       exit(0);
+      return;
     }
 
-    if (kDebugMode) print('[PlatformUpdater] Launching update script: $_preparedScriptPath');
+    _log('Launching update script: $_preparedScriptPath');
 
     if (Platform.isWindows) {
       await Process.start(
@@ -320,7 +372,7 @@ echo "[Update Script] Done!"
       );
     }
 
-    if (kDebugMode) print('[PlatformUpdater] Script launched, exiting app...');
+    _log('Script launched, exiting app...');
     exit(0);
   }
 }
