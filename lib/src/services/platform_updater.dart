@@ -220,31 +220,45 @@ class PlatformUpdater {
       } else if (Platform.isWindows) {
         final currentDir = path.dirname(currentExe);
         final scriptPath = path.join(tempDir.path, 'update_helper.bat');
+        final vbsPath = path.join(tempDir.path, 'update_silent.vbs');
 
         final script = '''
 @echo off
-echo [Update Script] Starting update process...
+setlocal EnableDelayedExpansion
+
+REM Wait for app to close
 timeout /t 3 /nobreak > nul
 
-echo [Update Script] Killing current app...
+REM Kill any remaining processes
 taskkill /F /IM StaffCo.exe 2>nul
+timeout /t 1 /nobreak > nul
 
-timeout /t 2 /nobreak > nul
+REM Copy new files
+xcopy /E /I /Y /Q "$newAppPath\\*" "$currentDir\\" > nul 2>&1
 
-echo [Update Script] Copying new files...
-xcopy /E /I /Y "$newAppPath" "$currentDir"
+REM Wait a bit
+timeout /t 1 /nobreak > nul
 
-echo [Update Script] Starting new app...
+REM Start new app (detached from this process)
 start "" "$currentExe"
 
-echo [Update Script] Cleaning up...
+REM Clean up
+timeout /t 1 /nobreak > nul
+del "$vbsPath" 2>nul
 del "%~f0"
 ''';
 
-        await File(scriptPath).writeAsString(script);
+        final vbsScript = '''
+Set WshShell = CreateObject("WScript.Shell")
+WshShell.Run """$scriptPath""", 0, False
+Set WshShell = Nothing
+''';
 
-        _log('Created Windows script: $scriptPath');
-        return scriptPath;
+        await File(scriptPath).writeAsString(script);
+        await File(vbsPath).writeAsString(vbsScript);
+
+        _log('Created Windows scripts: $scriptPath, $vbsPath');
+        return vbsPath;
 
       } else if (Platform.isLinux) {
         final currentDir = path.dirname(currentExe);
@@ -359,8 +373,8 @@ echo "[Update Script] Done!"
 
     if (Platform.isWindows) {
       await Process.start(
-        'cmd',
-        ['/c', _preparedScriptPath!],
+        'wscript.exe',
+        [_preparedScriptPath!],
         mode: ProcessStartMode.detached,
       );
     } else {
@@ -373,6 +387,9 @@ echo "[Update Script] Done!"
     }
 
     _log('Script launched, exiting app...');
+
+    await Future.delayed(const Duration(milliseconds: 500));
+
     exit(0);
   }
 }
