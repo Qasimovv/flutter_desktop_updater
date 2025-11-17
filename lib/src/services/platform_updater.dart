@@ -219,38 +219,64 @@ class PlatformUpdater {
 
       } else if (Platform.isWindows) {
         final currentDir = path.dirname(currentExe);
+        final currentExeName = path.basename(currentExe);
         final scriptPath = path.join(tempDir.path, 'update_helper.bat');
         final vbsPath = path.join(tempDir.path, 'update_silent.vbs');
 
+        // BAT script - PID-based kill (prevents logout!)
         final script = '''
 @echo off
 setlocal EnableDelayedExpansion
 
-REM Wait for app to close
+REM Get current process PID from argument
+set CURRENT_PID=%1
+if "%CURRENT_PID%"=="" (
+    echo ERROR: No PID provided
+    exit /b 1
+)
+
+echo [Update] Waiting for app to close...
 timeout /t 3 /nobreak > nul
 
-REM Kill any remaining processes
-taskkill /F /IM StaffCo.exe 2>nul
-timeout /t 1 /nobreak > nul
+REM Kill only the specific process by PID (NOT by name to avoid logout!)
+taskkill /F /PID %CURRENT_PID% 2>nul
+
+echo [Update] Waiting for cleanup...
+timeout /t 2 /nobreak > nul
 
 REM Copy new files
+echo [Update] Installing update...
 xcopy /E /I /Y /Q "$newAppPath\\*" "$currentDir\\" > nul 2>&1
 
-REM Wait a bit
+if %ERRORLEVEL% neq 0 (
+    echo [Update] Copy failed!
+    exit /b 1
+)
+
+echo [Update] Starting new version...
 timeout /t 1 /nobreak > nul
 
-REM Start new app (detached from this process)
-start "" "$currentExe"
+REM Start new app (completely detached from this process)
+start "" /B "$currentExe"
 
-REM Clean up
+REM Clean up script files
 timeout /t 1 /nobreak > nul
 del "$vbsPath" 2>nul
 del "%~f0"
+
+exit
 ''';
 
+        // VBS script - Launches BAT invisibly and passes PID
         final vbsScript = '''
 Set WshShell = CreateObject("WScript.Shell")
-WshShell.Run """$scriptPath""", 0, False
+Set objArgs = WScript.Arguments
+
+If objArgs.Count > 0 Then
+    currentPID = objArgs(0)
+    WshShell.Run """$scriptPath"" " & currentPID, 0, False
+End If
+
 Set WshShell = Nothing
 ''';
 
@@ -266,11 +292,13 @@ Set WshShell = Nothing
 
         final script = '''
 #!/bin/bash
+CURRENT_PID=\$1
+
 echo "[Update Script] Starting update process..."
 sleep 3
 
-echo "[Update Script] Killing current app..."
-killall staffco StaffCo 2>/dev/null
+echo "[Update Script] Killing current app (PID: \$CURRENT_PID)..."
+kill -9 \$CURRENT_PID 2>/dev/null
 
 sleep 2
 
@@ -371,23 +399,29 @@ echo "[Update Script] Done!"
 
     _log('Launching update script: $_preparedScriptPath');
 
+    // Get current process PID
+    final currentPID = pid.toString();
+    _log('Current PID: $currentPID');
+
     if (Platform.isWindows) {
+      // Launch VBS file with PID (no CMD window will appear)
       await Process.start(
         'wscript.exe',
-        [_preparedScriptPath!],
+        [_preparedScriptPath!, currentPID],
         mode: ProcessStartMode.detached,
       );
     } else {
       await Process.start(
         'nohup',
-        ['/bin/sh', _preparedScriptPath!],
+        ['/bin/sh', _preparedScriptPath!, currentPID],
         mode: ProcessStartMode.detached,
         workingDirectory: Directory.systemTemp.path,
       );
     }
 
-    _log('Script launched, exiting app...');
+    _log('Script launched with PID, exiting app...');
 
+    // Wait briefly to ensure script starts
     await Future.delayed(const Duration(milliseconds: 500));
 
     exit(0);

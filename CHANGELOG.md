@@ -1,6 +1,6 @@
 # Changelog
 
-## [0.0.3] - 2025-11-13
+## [0.0.5] - 2025-11-17
 
 ### Added
 - Initial release
