@@ -4,6 +4,7 @@ class UpdateInfo {
   final String downloadUrl;
   final int fileSize;
   final String releaseNotes;
+  final bool? updateRequired;
 
   UpdateInfo({
     required this.version,
@@ -11,6 +12,7 @@ class UpdateInfo {
     required this.downloadUrl,
     required this.fileSize,
     required this.releaseNotes,
+    this.updateRequired = false,
   });
 
   factory UpdateInfo.fromJson(Map<String, dynamic> json) {
@@ -20,6 +22,7 @@ class UpdateInfo {
       downloadUrl: json['download_url'],
       fileSize: json['file_size'],
       releaseNotes: json['release_notes'],
+      updateRequired: json['update_required'],
     );
   }
 

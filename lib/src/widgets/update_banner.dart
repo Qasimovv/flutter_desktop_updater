@@ -14,7 +14,9 @@ class UpdateBanner extends StatelessWidget {
         return switch (manager.status) {
           UpdateStatus.updateAvailable => _AvailableBanner(manager: manager),
           UpdateStatus.updating => _UpdatingBanner(progress: manager.progress),
-          UpdateStatus.readyToRestart => _ReadyToRestartBanner(onRestart: manager.restartApp),
+          UpdateStatus.readyToRestart => _ReadyToRestartBanner(
+            onRestart: manager.restartApp,
+          ),
           // UpdateStatus.error => _ErrorBanner(
           //   error: manager.error ?? 'Unknown error',
           //   onRetry: manager.checkForUpdate,
@@ -68,11 +70,10 @@ class _AvailableBanner extends StatelessWidget {
               ],
             ),
           ),
-          TextButton(
-            onPressed: manager.dismiss,
-            child: const Text('Later'),
-          ),
-          const SizedBox(width: 4),
+          if (info.updateRequired!=null && !info.updateRequired!) ...[
+            TextButton(onPressed: manager.dismiss, child: const Text('Later')),
+            const SizedBox(width: 4),
+          ],
           ElevatedButton(
             onPressed: manager.startUpdate,
             style: ElevatedButton.styleFrom(
@@ -248,10 +249,7 @@ class _ErrorBanner extends StatelessWidget {
               ],
             ),
           ),
-          TextButton(
-            onPressed: onDismiss,
-            child: const Text('Dismiss'),
-          ),
+          TextButton(onPressed: onDismiss, child: const Text('Dismiss')),
           const SizedBox(width: 4),
           ElevatedButton(
             onPressed: onRetry,
