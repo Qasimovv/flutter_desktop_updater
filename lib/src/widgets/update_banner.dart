@@ -15,11 +15,11 @@ class UpdateBanner extends StatelessWidget {
           UpdateStatus.updateAvailable => _AvailableBanner(manager: manager),
           UpdateStatus.updating => _UpdatingBanner(progress: manager.progress),
           UpdateStatus.readyToRestart => _ReadyToRestartBanner(onRestart: manager.restartApp),
-          UpdateStatus.error => _ErrorBanner(
-            error: manager.error ?? 'Unknown error',
-            onRetry: manager.checkForUpdate,
-            onDismiss: manager.dismiss,
-          ),
+          // UpdateStatus.error => _ErrorBanner(
+          //   error: manager.error ?? 'Unknown error',
+          //   onRetry: manager.checkForUpdate,
+          //   onDismiss: manager.dismiss,
+          // ),
           _ => const SizedBox.shrink(),
         };
       },
