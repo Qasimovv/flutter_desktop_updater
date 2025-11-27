@@ -217,13 +217,19 @@ class PlatformUpdater {
         _log('Created macOS script: $scriptPath');
         return scriptPath;
 
-      } else if (Platform.isWindows) {
+      }
+      else if (Platform.isWindows) {
         final currentDir = path.dirname(currentExe);
         final currentExeName = path.basename(currentExe);
         final scriptPath = path.join(tempDir.path, 'update_helper.bat');
         final vbsPath = path.join(tempDir.path, 'update_silent.vbs');
 
-        // BAT script - PID-based kill (prevents logout!)
+        // Check if admin rights needed (Program Files installation)
+        final needsAdmin = currentDir.toLowerCase().contains('program files');
+        _log('Installation path: $currentDir');
+        _log('Needs admin: $needsAdmin');
+
+        // BAT script - PID-based kill with proper error handling
         final script = '''
 @echo off
 setlocal EnableDelayedExpansion
@@ -249,26 +255,39 @@ echo [Update] Installing update...
 xcopy /E /I /Y /Q "$newAppPath\\*" "$currentDir\\" > nul 2>&1
 
 if %ERRORLEVEL% neq 0 (
-    echo [Update] Copy failed!
+    echo [Update] Copy failed with error: %ERRORLEVEL%
+    echo [Update] Source: $newAppPath
+    echo [Update] Target: $currentDir
+    pause
     exit /b 1
 )
 
-echo [Update] Starting new version...
+echo [Update] Update installed successfully
 timeout /t 1 /nobreak > nul
 
+echo [Update] Starting new version...
 REM Start new app (completely detached from this process)
-start "" /B "$currentExe"
+start "" "$currentExe"
 
 REM Clean up script files
-timeout /t 1 /nobreak > nul
+timeout /t 2 /nobreak > nul
 del "$vbsPath" 2>nul
-del "%~f0"
+(goto) 2>nul & del "%~f0"
 
 exit
 ''';
 
-        // VBS script - Launches BAT invisibly and passes PID
-        final vbsScript = '''
+        // VBS script - Launches BAT with admin if needed, passes PID
+        final vbsScript = needsAdmin ? '''
+Set objShell = CreateObject("Shell.Application")
+Set objArgs = WScript.Arguments
+
+If objArgs.Count > 0 Then
+    currentPID = objArgs(0)
+    ' Run BAT with admin privileges
+    objShell.ShellExecute "cmd.exe", "/c ""$scriptPath"" " & currentPID, "", "runas", 0
+End If
+''' : '''
 Set WshShell = CreateObject("WScript.Shell")
 Set objArgs = WScript.Arguments
 
@@ -285,7 +304,6 @@ Set WshShell = Nothing
 
         _log('Created Windows scripts: $scriptPath, $vbsPath');
         return vbsPath;
-
       } else if (Platform.isLinux) {
         final currentDir = path.dirname(currentExe);
         final scriptPath = path.join(tempDir.path, 'update_helper.sh');
