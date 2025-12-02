@@ -2,7 +2,44 @@ import 'package:flutter/material.dart';
 import '../services/update_manager.dart';
 
 class UpdateBanner extends StatelessWidget {
-  const UpdateBanner({super.key});
+  const UpdateBanner({
+    super.key,
+    this.onUpdateAvailable,
+    this.onUpdating,
+    this.onReadyToRestart,
+    this.onError,
+  });
+
+  /// Called when update is available
+  /// [onUpdate] - starts downloading and installing
+  /// [onDismiss] - dismisses the update notification
+  final Widget Function(
+    BuildContext context,
+    VoidCallback onUpdate,
+    VoidCallback onDismiss,
+  )?
+  onUpdateAvailable;
+
+  /// Called during update download/installation
+  /// [progress] - download progress (0.0 to 1.0)
+  final Widget Function(BuildContext context, double progress)? onUpdating;
+
+  /// Called when update is ready to restart
+  /// [onRestart] - quits and restarts the app
+  final Widget Function(BuildContext context, VoidCallback onRestart)?
+  onReadyToRestart;
+
+  /// Called when update fails
+  /// [error] - error message
+  /// [onRetry] - retries the update check
+  /// [onDismiss] - dismisses the error
+  final Widget Function(
+    BuildContext context,
+    String error,
+    VoidCallback onRetry,
+    VoidCallback onDismiss,
+  )?
+  onError;
 
   @override
   Widget build(BuildContext context) {
@@ -12,17 +49,40 @@ class UpdateBanner extends StatelessWidget {
         final manager = UpdateManager();
 
         return switch (manager.status) {
-          UpdateStatus.updateAvailable => _AvailableBanner(manager: manager),
-          UpdateStatus.updating => _UpdatingBanner(progress: manager.progress),
-          UpdateStatus.readyToRestart => _ReadyToRestartBanner(
-            onRestart: manager.restartApp,
-          ),
-          // UpdateStatus.error => _ErrorBanner(
+          // UpdateStatus.updateAvailable => onUpdateAvailable != null
+          //     ? onUpdateAvailable!(
+          //   context,
+          //   manager.startUpdate,
+          //   manager.dismiss,
+          // )
+          //     : _AvailableBanner(manager: manager),
+          //
+          // UpdateStatus.updating => onUpdating != null
+          //     ? onUpdating!(context, manager.progress)
+          //     : _UpdatingBanner(progress: manager.progress),
+          //
+          // UpdateStatus.readyToRestart => onReadyToRestart != null
+          //     ? onReadyToRestart!(context, manager.restartApp)
+          //     : _ReadyToRestartBanner(onRestart: manager.restartApp),
+          //
+          // UpdateStatus.error => onError != null
+          //     ? onError!(
+          //   context,
+          //   manager.error ?? 'Unknown error',
+          //   manager.checkForUpdate,
+          //   manager.dismiss,
+          // )
+          //     : _ErrorBanner(
           //   error: manager.error ?? 'Unknown error',
           //   onRetry: manager.checkForUpdate,
           //   onDismiss: manager.dismiss,
           // ),
-          _ => const SizedBox.shrink(),
+
+          // _ => const SizedBox.shrink(),
+          _ =>
+     onUpdating != null
+            ? onUpdating!(context, manager.progress)
+            : _UpdatingBanner(progress: manager.progress),
         };
       },
     );
@@ -70,7 +130,7 @@ class _AvailableBanner extends StatelessWidget {
               ],
             ),
           ),
-          if (info.updateRequired!=null && !info.updateRequired!) ...[
+          if (info.updateRequired != null && !info.updateRequired!) ...[
             TextButton(onPressed: manager.dismiss, child: const Text('Later')),
             const SizedBox(width: 4),
           ],
