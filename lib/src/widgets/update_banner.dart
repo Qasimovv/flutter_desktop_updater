@@ -49,40 +49,40 @@ class UpdateBanner extends StatelessWidget {
         final manager = UpdateManager();
 
         return switch (manager.status) {
-          // UpdateStatus.updateAvailable => onUpdateAvailable != null
-          //     ? onUpdateAvailable!(
-          //   context,
-          //   manager.startUpdate,
-          //   manager.dismiss,
-          // )
-          //     : _AvailableBanner(manager: manager),
-          //
-          // UpdateStatus.updating => onUpdating != null
-          //     ? onUpdating!(context, manager.progress)
-          //     : _UpdatingBanner(progress: manager.progress),
-          //
-          // UpdateStatus.readyToRestart => onReadyToRestart != null
-          //     ? onReadyToRestart!(context, manager.restartApp)
-          //     : _ReadyToRestartBanner(onRestart: manager.restartApp),
-          //
-          // UpdateStatus.error => onError != null
-          //     ? onError!(
-          //   context,
-          //   manager.error ?? 'Unknown error',
-          //   manager.checkForUpdate,
-          //   manager.dismiss,
-          // )
-          //     : _ErrorBanner(
-          //   error: manager.error ?? 'Unknown error',
-          //   onRetry: manager.checkForUpdate,
-          //   onDismiss: manager.dismiss,
-          // ),
+          UpdateStatus.updateAvailable => onUpdateAvailable != null
+              ? onUpdateAvailable!(
+            context,
+            manager.startUpdate,
+            manager.dismiss,
+          )
+              : _AvailableBanner(manager: manager),
 
-          // _ => const SizedBox.shrink(),
-          _ =>
-     onUpdating != null
-            ? onUpdating!(context, manager.progress)
-            : _UpdatingBanner(progress: manager.progress),
+          UpdateStatus.updating => onUpdating != null
+              ? onUpdating!(context, manager.progress)
+              : _UpdatingBanner(progress: manager.progress),
+
+          UpdateStatus.readyToRestart => onReadyToRestart != null
+              ? onReadyToRestart!(context, manager.restartApp)
+              : _ReadyToRestartBanner(onRestart: manager.restartApp),
+
+          UpdateStatus.error => onError != null
+              ? onError!(
+            context,
+            manager.error ?? 'Unknown error',
+            manager.checkForUpdate,
+            manager.dismiss,
+          )
+              : _ErrorBanner(
+            error: manager.error ?? 'Unknown error',
+            onRetry: manager.checkForUpdate,
+            onDismiss: manager.dismiss,
+          ),
+
+          _ => const SizedBox.shrink(),
+          // _ =>
+     // onUpdating != null
+     //        ? onUpdating!(context, manager.progress)
+     //        : _UpdatingBanner(progress: manager.progress),
         };
       },
     );
