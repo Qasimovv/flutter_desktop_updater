@@ -5,8 +5,9 @@ homepage: https://github.com/qasimovv/flutter_desktop_updater
 repository: https://github.com/qasimovv/flutter_desktop_updater
 
 environment:
-  sdk: ^3.9.2
+  sdk: ">=3.0.0 <4.0.0"
   flutter: ">=1.17.0"
+
 
 dependencies:
   flutter:
