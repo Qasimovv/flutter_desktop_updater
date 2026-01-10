@@ -5,6 +5,13 @@ import 'package:path/path.dart' as path;
 
 class PlatformUpdater {
   String? _preparedScriptPath;
+  String? _currentExtractPath;
+
+  /// Get prepared script path
+  String? get preparedScriptPath => _preparedScriptPath;
+  
+  /// Get current extract path
+  String? get extractPath => _currentExtractPath;
 
   /// Logs message (always, including release builds)
   void _log(String message) {
@@ -21,6 +28,8 @@ class PlatformUpdater {
         _log('Failed to extract ZIP');
         return false;
       }
+
+      _currentExtractPath = extractPath;
 
       final newAppPath = await _findApp(extractPath);
       if (newAppPath == null) {
@@ -404,6 +413,14 @@ rm -f "$scriptPath"
 
 echo "[Update Script] Done!"
 ''';
+  }
+
+  /// Set prepared script path (useful when restoring from cache)
+  void setPreparedScriptPath(String? scriptPath) {
+    _preparedScriptPath = scriptPath;
+    if (scriptPath != null) {
+      _log('Restored script path: $scriptPath');
+    }
   }
 
   Future<void> restartApp() async {
