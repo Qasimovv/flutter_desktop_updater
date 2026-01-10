@@ -1,14 +1,17 @@
 import 'package:flutter/material.dart';
 import '../services/update_manager.dart';
 
-class UpdateBanner extends StatelessWidget {
+class UpdateBanner extends StatefulWidget {
   const UpdateBanner({
     super.key,
     this.onUpdateAvailable,
     this.onUpdating,
     this.onReadyToRestart,
     this.onError,
+    this.autoCheckOnInit = true,
   });
+
+  final bool autoCheckOnInit;
 
   /// Called when update is available
   /// [manager] - UpdateManager instance for full control
@@ -48,6 +51,27 @@ class UpdateBanner extends StatelessWidget {
   )? onError;
 
   @override
+  State<UpdateBanner> createState() => _UpdateBannerState();
+}
+
+class _UpdateBannerState extends State<UpdateBanner> {
+  bool _hasChecked = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.autoCheckOnInit) {
+      // Trigger first check and start periodic checks
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && !_hasChecked) {
+          _hasChecked = true;
+          UpdateManager().checkForUpdate();
+        }
+      });
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
     return ListenableBuilder(
       listenable: UpdateManager(),
@@ -55,23 +79,23 @@ class UpdateBanner extends StatelessWidget {
         final manager = UpdateManager();
 
         return switch (manager.status) {
-          UpdateStatus.updateAvailable => onUpdateAvailable != null
-              ? onUpdateAvailable!(
+          UpdateStatus.updateAvailable => widget.onUpdateAvailable != null
+              ? widget.onUpdateAvailable!(
                   context,
                   manager,
                   manager.startUpdate,
                   manager.dismiss,
                 )
               : _AvailableBanner(manager: manager),
-          UpdateStatus.updating => onUpdating != null
-              ? onUpdating!(context, manager, manager.progress)
+          UpdateStatus.updating => widget.onUpdating != null
+              ? widget.onUpdating!(context, manager, manager.progress)
               : _UpdatingBanner(manager: manager, progress: manager.progress),
-          UpdateStatus.readyToRestart => onReadyToRestart != null
-              ? onReadyToRestart!(context, manager, manager.restartApp)
+          UpdateStatus.readyToRestart => widget.onReadyToRestart != null
+              ? widget.onReadyToRestart!(context, manager, manager.restartApp)
               : _ReadyToRestartBanner(
                   manager: manager, onRestart: manager.restartApp),
-          UpdateStatus.error => onError != null
-              ? onError!(
+          UpdateStatus.error => widget.onError != null
+              ? widget.onError!(
                   context,
                   manager,
                   manager.error ?? 'Unknown error',

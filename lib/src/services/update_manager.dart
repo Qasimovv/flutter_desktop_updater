@@ -30,6 +30,8 @@ class UpdateManager extends ChangeNotifier {
   String? _cachedZipPath;
   String? _cachedExtractPath;
   String? _preparedScriptPath;
+  Timer? _periodicCheckTimer;
+  bool _periodicCheckStarted = false;
 
   UpdateStatus get status => _status;
   UpdateInfo? get updateInfo => _updateInfo;
@@ -37,6 +39,9 @@ class UpdateManager extends ChangeNotifier {
   String? get error => _error;
 
   final _updater = PlatformUpdater();
+
+  /// Interval for periodic update checks (2 hours)
+  static const Duration _checkInterval = Duration(hours: 2);
 
   /// Get cache file path for storing update info
   File _getCacheFile() {
@@ -146,8 +151,56 @@ class UpdateManager extends ChangeNotifier {
     }
   }
 
+  /// Start periodic update checks every 2 hours
+  ///
+  /// If [performInitialCheck] is true (default), performs an immediate check.
+  /// Set to false to avoid double-checking when called from checkForUpdate().
+  void startPeriodicChecks({bool performInitialCheck = true}) {
+    if (_periodicCheckStarted) {
+      _log('⏰ Periodic checks already started');
+      return;
+    }
+
+    _log('⏰ Starting periodic update checks (every 2 hours)');
+    _periodicCheckStarted = true;
+
+    // Perform initial check if requested
+    if (performInitialCheck) {
+      checkForUpdate();
+    }
+
+    // Start periodic timer
+    _periodicCheckTimer?.cancel();
+    _periodicCheckTimer = Timer.periodic(_checkInterval, (_) {
+      _log('⏰ Periodic update check triggered');
+      checkForUpdate();
+    });
+  }
+
+  /// Stop periodic update checks
+  void stopPeriodicChecks() {
+    if (!_periodicCheckStarted) {
+      return;
+    }
+
+    _log('⏰ Stopping periodic update checks');
+    _periodicCheckStarted = false;
+    _periodicCheckTimer?.cancel();
+    _periodicCheckTimer = null;
+  }
+
+  /// Check if periodic checks are running
+  bool get isPeriodicCheckActive => _periodicCheckStarted;
+
   Future<void> checkForUpdate() async {
     _log('🔍 Checking for updates...');
+
+    // Automatically start periodic checks on first check if not already started
+    // Pass false to avoid double-checking (we're already in a check)
+    if (!_periodicCheckStarted) {
+      startPeriodicChecks(performInitialCheck: false);
+    }
+
     _setStatus(UpdateStatus.checking);
 
     try {
@@ -365,5 +418,11 @@ class UpdateManager extends ChangeNotifier {
 
   void _log(String msg) {
     if (kDebugMode) print('[UpdateManager] $msg');
+  }
+
+  @override
+  void dispose() {
+    stopPeriodicChecks();
+    super.dispose();
   }
 }
