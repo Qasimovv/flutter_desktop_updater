@@ -151,7 +151,7 @@ class UpdateManager extends ChangeNotifier {
     _setStatus(UpdateStatus.checking);
 
     try {
-      final updateJsonUrl = UpdateConfig().updateJsonUrl; // ← Config-dən götür
+      final updateJsonUrl = UpdateConfig().updateJsonUrl;
 
       final response = await http.get(Uri.parse(updateJsonUrl)).timeout(
             const Duration(seconds: 10),
