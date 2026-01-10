@@ -49,40 +49,44 @@ class UpdateBanner extends StatelessWidget {
         final manager = UpdateManager();
 
         return switch (manager.status) {
-          UpdateStatus.updateAvailable => onUpdateAvailable != null
-              ? onUpdateAvailable!(
-            context,
-            manager.startUpdate,
-            manager.dismiss,
-          )
-              : _AvailableBanner(manager: manager),
+          UpdateStatus.updateAvailable =>
+            onUpdateAvailable != null
+                ? onUpdateAvailable!(
+                    context,
+                    manager.startUpdate,
+                    manager.dismiss,
+                  )
+                : _AvailableBanner(manager: manager),
 
-          UpdateStatus.updating => onUpdating != null
-              ? onUpdating!(context, manager.progress)
-              : _UpdatingBanner(progress: manager.progress),
+          UpdateStatus.updating =>
+            onUpdating != null
+                ? onUpdating!(context, manager.progress)
+                : _UpdatingBanner(progress: manager.progress),
 
-          UpdateStatus.readyToRestart => onReadyToRestart != null
-              ? onReadyToRestart!(context, manager.restartApp)
-              : _ReadyToRestartBanner(onRestart: manager.restartApp),
+          UpdateStatus.readyToRestart =>
+            onReadyToRestart != null
+                ? onReadyToRestart!(context, manager.restartApp)
+                : _ReadyToRestartBanner(onRestart: manager.restartApp),
 
-          UpdateStatus.error => onError != null
-              ? onError!(
-            context,
-            manager.error ?? 'Unknown error',
-            manager.checkForUpdate,
-            manager.dismiss,
-          )
-              : _ErrorBanner(
-            error: manager.error ?? 'Unknown error',
-            onRetry: manager.checkForUpdate,
-            onDismiss: manager.dismiss,
-          ),
+          UpdateStatus.error =>
+            onError != null
+                ? onError!(
+                    context,
+                    manager.error ?? 'Unknown error',
+                    manager.checkForUpdate,
+                    manager.dismiss,
+                  )
+                : _ErrorBanner(
+                    error: manager.error ?? 'Unknown error',
+                    onRetry: manager.checkForUpdate,
+                    onDismiss: manager.dismiss,
+                  ),
 
           _ => const SizedBox.shrink(),
           // _ =>
-     // onUpdating != null
-     //        ? onUpdating!(context, manager.progress)
-     //        : _UpdatingBanner(progress: manager.progress),
+          // onUpdating != null
+          //        ? onUpdating!(context, manager.progress)
+          //        : _UpdatingBanner(progress: manager.progress),
         };
       },
     );
@@ -99,7 +103,6 @@ class _AvailableBanner extends StatelessWidget {
     final info = manager.updateInfo!;
     return Container(
       margin: const EdgeInsets.all(16),
-      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: Colors.blue.shade50,
         borderRadius: BorderRadius.circular(8),
