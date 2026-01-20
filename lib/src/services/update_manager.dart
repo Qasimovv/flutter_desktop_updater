@@ -40,8 +40,9 @@ class UpdateManager extends ChangeNotifier {
 
   final _updater = PlatformUpdater();
 
-  /// Interval for periodic update checks (2 hours)
-  static const Duration _checkInterval = Duration(hours: 2);
+  /// Interval for periodic update checks
+  /// Default: 2 hours, changes to 5 minutes on error
+  Duration _checkInterval = const Duration(hours: 2);
 
   /// Get cache file path for storing update info
   File _getCacheFile() {
@@ -161,7 +162,8 @@ class UpdateManager extends ChangeNotifier {
       return;
     }
 
-    _log('⏰ Starting periodic update checks (every 2 hours)');
+    _log(
+        '⏰ Starting periodic update checks (every ${_checkInterval.inHours} hours)');
     _periodicCheckStarted = true;
 
     // Perform initial check if requested
@@ -171,6 +173,24 @@ class UpdateManager extends ChangeNotifier {
 
     // Start periodic timer
     _periodicCheckTimer?.cancel();
+    _periodicCheckTimer = Timer.periodic(_checkInterval, (_) {
+      _log('⏰ Periodic update check triggered');
+      checkForUpdate();
+    });
+  }
+
+  /// Restart periodic timer with current interval
+  void _restartPeriodicTimer() {
+    if (!_periodicCheckStarted) return;
+
+    _periodicCheckTimer?.cancel();
+    final intervalHours = _checkInterval.inMinutes / 60;
+    final intervalMinutes = _checkInterval.inMinutes;
+    final intervalText = intervalMinutes < 60
+        ? '${intervalMinutes} minutes'
+        : '${intervalHours.toStringAsFixed(1)} hours';
+    _log('⏰ Restarting periodic checks (every $intervalText)');
+
     _periodicCheckTimer = Timer.periodic(_checkInterval, (_) {
       _log('⏰ Periodic update check triggered');
       checkForUpdate();
@@ -267,9 +287,21 @@ class UpdateManager extends ChangeNotifier {
         _setStatus(UpdateStatus.initial);
         _log('✅ Up to date');
       }
+
+      // Success: set interval to 2 hours
+      if (_checkInterval != const Duration(hours: 2)) {
+        _checkInterval = const Duration(hours: 2);
+        _restartPeriodicTimer();
+      }
     } catch (e) {
       _log('❌ Check failed: $e');
       _setError('Failed to check for updates: $e');
+
+      // Error: set interval to 5 minutes
+      if (_checkInterval != const Duration(minutes: 5)) {
+        _checkInterval = const Duration(minutes: 5);
+        _restartPeriodicTimer();
+      }
     }
   }
 
