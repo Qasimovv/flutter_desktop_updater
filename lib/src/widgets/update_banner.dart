@@ -1,17 +1,20 @@
 import 'package:flutter/material.dart';
+import '../models/update_info.dart';
 import '../services/update_manager.dart';
 
 class UpdateBanner extends StatefulWidget {
   const UpdateBanner({
     super.key,
+    this.updateInfo,
     this.onUpdateAvailable,
     this.onUpdating,
     this.onReadyToRestart,
     this.onError,
-    this.autoCheckOnInit = true,
   });
 
-  final bool autoCheckOnInit;
+  /// Update info provided from outside. The app fetches this from its own
+  /// backend/API and passes it here. No automatic fetching.
+  final UpdateInfo? updateInfo;
 
   /// Called when update is available
   /// [manager] - UpdateManager instance for full control
@@ -40,7 +43,7 @@ class UpdateBanner extends StatefulWidget {
   /// Called when update fails
   /// [manager] - UpdateManager instance for full control
   /// [error] - error message
-  /// [onRetry] - retries the update check
+  /// [onRetry] - retries the update (download/install)
   /// [onDismiss] - dismisses the error
   final Widget Function(
     BuildContext context,
@@ -55,20 +58,27 @@ class UpdateBanner extends StatefulWidget {
 }
 
 class _UpdateBannerState extends State<UpdateBanner> {
-  bool _hasChecked = false;
+  UpdateInfo? _lastProcessedInfo;
 
   @override
   void initState() {
     super.initState();
-    if (widget.autoCheckOnInit) {
-      // Trigger first check and start periodic checks
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && !_hasChecked) {
-          _hasChecked = true;
-          UpdateManager().checkForUpdate();
-        }
-      });
+    _processUpdateInfo(widget.updateInfo);
+  }
+
+  @override
+  void didUpdateWidget(UpdateBanner oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.updateInfo != _lastProcessedInfo) {
+      _processUpdateInfo(widget.updateInfo);
     }
+  }
+
+  void _processUpdateInfo(UpdateInfo? info) {
+    if (info == _lastProcessedInfo) return;
+
+    _lastProcessedInfo = info;
+    UpdateManager().setUpdateInfo(info);
   }
 
   @override
@@ -99,13 +109,13 @@ class _UpdateBannerState extends State<UpdateBanner> {
                   context,
                   manager,
                   manager.error ?? 'Unknown error',
-                  manager.checkForUpdate,
+                  manager.startUpdate,
                   manager.dismiss,
                 )
               : _ErrorBanner(
                   manager: manager,
                   error: manager.error ?? 'Unknown error',
-                  onRetry: manager.checkForUpdate,
+                  onRetry: manager.startUpdate,
                   onDismiss: manager.dismiss,
                 ),
           _ => const SizedBox.shrink(),
@@ -149,7 +159,7 @@ class _AvailableBanner extends StatelessWidget {
                 ),
                 const SizedBox(height: 2),
                 Text(
-                  'Version ${info.version} • ${(info.fileSize / 1024 / 1024).toStringAsFixed(1)} MB',
+                  'Version ${info.version.latest} • ${(info.fileSize / 1024 / 1024).toStringAsFixed(1)} MB',
                   style: TextStyle(fontSize: 12, color: Colors.grey.shade700),
                 ),
               ],

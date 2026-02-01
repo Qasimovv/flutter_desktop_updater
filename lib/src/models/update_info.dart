@@ -1,5 +1,22 @@
+class Version {
+  final String minimum;
+  final String latest;
+
+  Version({
+    required this.minimum,
+    required this.latest,
+  });
+
+  factory Version.fromJson(Map<String, dynamic> json) {
+    return Version(
+      minimum: json['minimum'] as String,
+      latest: json['latest'] as String,
+    );
+  }
+}
+
 class UpdateInfo {
-  final String version;
+  final Version version;
   final String buildNumber;
   final String downloadUrl;
   final int fileSize;
@@ -17,23 +34,26 @@ class UpdateInfo {
 
   factory UpdateInfo.fromJson(Map<String, dynamic> json) {
     return UpdateInfo(
-      version: json['version'],
-      buildNumber: json['build_number'],
-      downloadUrl: json['download_url'],
-      fileSize: json['file_size'],
-      releaseNotes: json['release_notes'],
-      updateRequired: json['update_required'],
+      version: Version.fromJson(json['version'] as Map<String, dynamic>),
+      buildNumber: json['build_number'] as String,
+      downloadUrl: json['download_url'] as String,
+      fileSize: json['file_size'] as int,
+      releaseNotes: json['release_notes'] as String,
+      updateRequired: json['update_required'] as bool?,
     );
   }
 
   bool isNewerThan(String currentVersion, String currentBuildNumber) {
-    final newV = version.split('.').map(int.parse).toList();
+    final newV = version.latest.split('.').map(int.parse).toList();
     final curV = currentVersion.split('.').map(int.parse).toList();
 
-    for (int i = 0; i < 3; i++) {
+    for (var i = 0; i < newV.length && i < curV.length; i++) {
       if (newV[i] > curV[i]) return true;
       if (newV[i] < curV[i]) return false;
     }
+
+    if (newV.length > curV.length) return true;
+    if (newV.length < curV.length) return false;
 
     return int.parse(buildNumber) > int.parse(currentBuildNumber);
   }

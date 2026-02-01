@@ -1,4 +1,3 @@
-import 'dart:async';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -7,7 +6,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path/path.dart' as path;
 import 'platform_updater.dart';
 import '../models/update_info.dart';
-import '../config/update_config.dart';
 
 enum UpdateStatus {
   initial,
@@ -30,8 +28,6 @@ class UpdateManager extends ChangeNotifier {
   String? _cachedZipPath;
   String? _cachedExtractPath;
   String? _preparedScriptPath;
-  Timer? _periodicCheckTimer;
-  bool _periodicCheckStarted = false;
 
   UpdateStatus get status => _status;
   UpdateInfo? get updateInfo => _updateInfo;
@@ -39,10 +35,6 @@ class UpdateManager extends ChangeNotifier {
   String? get error => _error;
 
   final _updater = PlatformUpdater();
-
-  /// Interval for periodic update checks
-  /// Default: 2 hours, changes to 5 minutes on error
-  Duration _checkInterval = const Duration(hours: 2);
 
   /// Get cache file path for storing update info
   File _getCacheFile() {
@@ -64,12 +56,12 @@ class UpdateManager extends ChangeNotifier {
         'zipPath': zipPath,
         'extractPath': extractPath,
         'scriptPath': scriptPath,
-        'version': info.version,
+        'version': info.version.latest,
         'buildNumber': info.buildNumber,
         'downloadUrl': info.downloadUrl,
       };
       cacheFile.writeAsStringSync(jsonEncode(cacheData));
-      _log('💾 Cached update info: version ${info.version}');
+      _log('💾 Cached update info: version ${info.version.latest}');
     } catch (e) {
       _log('⚠️ Failed to save cache: $e');
     }
@@ -111,7 +103,7 @@ class UpdateManager extends ChangeNotifier {
       final cachedBuildNumber = cacheData['buildNumber'] as String?;
 
       // Check if version matches
-      if (cachedVersion != currentInfo.version ||
+      if (cachedVersion != currentInfo.version.latest ||
           cachedBuildNumber != currentInfo.buildNumber) {
         _log('🔄 Cached version mismatch, clearing cache');
         return false;
@@ -152,100 +144,28 @@ class UpdateManager extends ChangeNotifier {
     }
   }
 
-  /// Start periodic update checks every 2 hours
+  /// Set update info from outside. UpdateInfo is provided by the app - no
+  /// automatic fetching. Call this when you have new update info from your
+  /// backend/API.
   ///
-  /// If [performInitialCheck] is true (default), performs an immediate check.
-  /// Set to false to avoid double-checking when called from checkForUpdate().
-  void startPeriodicChecks({bool performInitialCheck = true}) {
-    if (_periodicCheckStarted) {
-      _log('⏰ Periodic checks already started');
+  /// If [info] is null, clears the update and resets to initial state.
+  /// If [info] is not null, compares with current app version and shows
+  /// update available if newer.
+  Future<void> setUpdateInfo(UpdateInfo? info) async {
+    if (info == null) {
+      dismiss();
       return;
     }
 
-    _log(
-        '⏰ Starting periodic update checks (every ${_checkInterval.inHours} hours)');
-    _periodicCheckStarted = true;
-
-    // Perform initial check if requested
-    if (performInitialCheck) {
-      checkForUpdate();
-    }
-
-    // Start periodic timer
-    _periodicCheckTimer?.cancel();
-    _periodicCheckTimer = Timer.periodic(_checkInterval, (_) {
-      _log('⏰ Periodic update check triggered');
-      checkForUpdate();
-    });
-  }
-
-  /// Restart periodic timer with current interval
-  void _restartPeriodicTimer() {
-    if (!_periodicCheckStarted) return;
-
-    _periodicCheckTimer?.cancel();
-    final intervalHours = _checkInterval.inMinutes / 60;
-    final intervalMinutes = _checkInterval.inMinutes;
-    final intervalText = intervalMinutes < 60
-        ? '${intervalMinutes} minutes'
-        : '${intervalHours.toStringAsFixed(1)} hours';
-    _log('⏰ Restarting periodic checks (every $intervalText)');
-
-    _periodicCheckTimer = Timer.periodic(_checkInterval, (_) {
-      _log('⏰ Periodic update check triggered');
-      checkForUpdate();
-    });
-  }
-
-  /// Stop periodic update checks
-  void stopPeriodicChecks() {
-    if (!_periodicCheckStarted) {
-      return;
-    }
-
-    _log('⏰ Stopping periodic update checks');
-    _periodicCheckStarted = false;
-    _periodicCheckTimer?.cancel();
-    _periodicCheckTimer = null;
-  }
-
-  /// Check if periodic checks are running
-  bool get isPeriodicCheckActive => _periodicCheckStarted;
-
-  Future<void> checkForUpdate() async {
-    _log('🔍 Checking for updates...');
-
-    // Automatically start periodic checks on first check if not already started
-    // Pass false to avoid double-checking (we're already in a check)
-    if (!_periodicCheckStarted) {
-      startPeriodicChecks(performInitialCheck: false);
-    }
+    _log('🔍 Processing update info...');
 
     _setStatus(UpdateStatus.checking);
 
     try {
-      final updateJsonUrl = UpdateConfig().updateJsonUrl;
-
-      final response = await http.get(Uri.parse(updateJsonUrl)).timeout(
-            const Duration(seconds: 10),
-          );
-
-      if (response.statusCode != 200) {
-        throw Exception('Server error: ${response.statusCode}');
-      }
-
-      final json = jsonDecode(response.body);
-      final platform = _getPlatform();
-
-      if (!json.containsKey(platform)) {
-        throw Exception('No updates for $platform');
-      }
-
-      final info = UpdateInfo.fromJson(json[platform]);
       final packageInfo = await PackageInfo.fromPlatform();
 
       _log('Current: ${packageInfo.version}+${packageInfo.buildNumber}');
-      _log('Available: ${info.version}+${info.buildNumber}');
+      _log('Available: ${info.version.latest}+${info.buildNumber}');
 
       if (info.isNewerThan(packageInfo.version, packageInfo.buildNumber)) {
         _updateInfo = info;
@@ -287,21 +207,9 @@ class UpdateManager extends ChangeNotifier {
         _setStatus(UpdateStatus.initial);
         _log('✅ Up to date');
       }
-
-      // Success: set interval to 2 hours
-      if (_checkInterval != const Duration(hours: 2)) {
-        _checkInterval = const Duration(hours: 2);
-        _restartPeriodicTimer();
-      }
     } catch (e) {
-      _log('❌ Check failed: $e');
-      _setError('Failed to check for updates: $e');
-
-      // Error: set interval to 5 minutes
-      if (_checkInterval != const Duration(minutes: 5)) {
-        _checkInterval = const Duration(minutes: 5);
-        _restartPeriodicTimer();
-      }
+      _log('❌ Error processing update info: $e');
+      _setError('Failed to process update: $e');
     }
   }
 
@@ -441,20 +349,7 @@ class UpdateManager extends ChangeNotifier {
     notifyListeners();
   }
 
-  String _getPlatform() {
-    if (Platform.isMacOS) return 'macos';
-    if (Platform.isWindows) return 'windows';
-    if (Platform.isLinux) return 'linux';
-    return '';
-  }
-
   void _log(String msg) {
     if (kDebugMode) print('[UpdateManager] $msg');
-  }
-
-  @override
-  void dispose() {
-    stopPeriodicChecks();
-    super.dispose();
   }
 }
